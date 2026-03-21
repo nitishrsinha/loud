@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Loud</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0a;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* --- Nickname modal --- */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 24px;
+    }
+    .modal-box {
+      background: #1a1a1a;
+      border-radius: 20px;
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
+    }
+    .modal-box h2 { font-size: 22px; margin-bottom: 8px; }
+    .modal-box p  { font-size: 14px; color: #888; margin-bottom: 24px; line-height: 1.5; }
+    .modal-input {
+      width: 100%;
+      background: #2a2a2a;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px;
+      color: #fff;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    .modal-input:focus { outline: none; border-color: #555; }
+    .modal-btn {
+      width: 100%;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* --- Header --- */
+    header {
+      padding: 20px;
+      text-align: center;
+      border-bottom: 1px solid #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+    }
+    .user-chip {
+      font-size: 12px;
+      color: #555;
+      letter-spacing: 1px;
+      cursor: pointer;
+    }
+    .user-chip:hover { color: #888; }
+
+    /* --- Location bar --- */
+    .location-bar {
+      padding: 10px 20px;
+      background: #111;
+      font-size: 13px;
+      color: #666;
+      text-align: center;
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .location-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #555;
+      flex-shrink: 0;
+    }
+    .location-dot.active { background: #00c853; }
+
+    /* --- Meter --- */
+    .meter-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 36px 20px 28px;
+      gap: 20px;
+    }
+
+    .meter-ring {
+      position: relative;
+      width: 190px;
+      height: 190px;
+    }
+    .meter-ring svg {
+      position: absolute;
+      inset: 0;
+      transform: rotate(-90deg);
+    }
+    .ring-track { stroke: #1e1e1e; }
+    .ring-fill  { stroke: #333; stroke-linecap: round; transition: stroke-dashoffset 0.2s, stroke 0.2s; }
+
+    .meter-inner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .db-number {
+      font-size: 62px;
+      font-weight: 200;
+      line-height: 1;
+      letter-spacing: -2px;
+    }
+    .db-unit {
+      font-size: 13px;
+      color: #555;
+      letter-spacing: 3px;
+      margin-top: 2px;
+    }
+
+    .noise-label {
+      font-size: 15px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #555;
+      min-height: 20px;
+    }
+
+    .measure-btn {
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 50px;
+      padding: 16px 52px;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .measure-btn:active  { transform: scale(0.97); }
+    .measure-btn:disabled { opacity: 0.35; cursor: default; }
+
+    .status-text {
+      font-size: 13px;
+      color: #555;
+      min-height: 18px;
+      letter-spacing: 0.5px;
+    }
+
+    /* --- History --- */
+    .history-section {
+      flex: 1;
+      padding: 0 16px 32px;
+      border-top: 1px solid #1a1a1a;
+    }
+    .history-header {
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #444;
+      padding: 16px 4px 12px;
+    }
+    .reading-card {
+      background: #111;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .reading-db {
+      font-size: 30px;
+      font-weight: 200;
+      min-width: 58px;
+      letter-spacing: -1px;
+    }
+    .reading-info { flex: 1; }
+    .reading-who  { font-size: 14px; font-weight: 500; }
+    .reading-meta { font-size: 12px; color: #555; margin-top: 3px; }
+    .level-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .empty-msg {
+      text-align: center;
+      color: #333;
+      font-size: 13px;
+      padding: 28px 0;
+      letter-spacing: 0.5px;
+    }
+
+    /* Level colors */
+    .c-quiet    { color: #00c853; }
+    .c-moderate { color: #ffd600; }
+    .c-loud     { color: #ff1744; }
+    .bg-quiet    { background: #00c853; }
+    .bg-moderate { background: #ffd600; }
+    .bg-loud     { background: #ff1744; }
+  </style>
+</head>
+<body>
+
+  <!-- Nickname modal -->
+  <div class="modal" id="nicknameModal">
+    <div class="modal-box">
+      <h2>Welcome to Loud</h2>
+      <p>Enter your name so your family knows who recorded each measurement.</p>
+      <input class="modal-input" id="nicknameInput" type="text" placeholder="Your name" maxlength="20" autocomplete="off">
+      <button class="modal-btn" id="nicknameSave">Get started</button>
+    </div>
+  </div>
+
+  <header>
+    <h1>Loud</h1>
+    <span class="user-chip" id="userChip" title="Tap to change name"></span>
+  </header>
+
+  <div class="location-bar">
+    <div class="location-dot" id="locationDot"></div>
+    <span id="locationText">Locating…</span>
+  </div>
+
+  <div class="meter-section">
+    <!-- Circular ring meter -->
+    <div class="meter-ring">
+      <svg viewBox="0 0 190 190" width="190" height="190">
+        <circle class="ring-track" cx="95" cy="95" r="82" fill="none" stroke-width="8"/>
+        <circle class="ring-fill"  cx="95" cy="95" r="82" fill="none" stroke-width="8"
+          stroke-dasharray="515"
+          stroke-dashoffset="515"
+          id="ringFill"/>
+      </svg>
+      <div class="meter-inner">
+        <span class="db-number" id="dbNumber">--</span>
+        <span class="db-unit">dB</span>
+      </div>
+    </div>
+
+    <span class="noise-label" id="noiseLabel"></span>
+    <button class="measure-btn" id="measureBtn">Measure</button>
+    <span class="status-text" id="statusText"></span>
+  </div>
+
+  <div class="history-section">
+    <div class="history-header">Nearby readings</div>
+    <div id="historyList">
+      <div class="empty-msg">No readings nearby yet.</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp }       from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, query,
+             orderBy, limit, getDocs, serverTimestamp }
+                                   from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+
+    // ── Firebase init ────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey:            "AIzaSyDuYM4gEzOkqpDZ0KN5DfK2KV_3xBdf-OM",
+      authDomain:        "loud-e6760.firebaseapp.com",
+      projectId:         "loud-e6760",
+      storageBucket:     "loud-e6760.firebasestorage.app",
+      messagingSenderId: "139350793793",
+      appId:             "1:139350793793:web:c5e231109b36f758c1b0c0"
+    };
+    const firebaseApp = initializeApp(firebaseConfig);
+    const firestore   = getFirestore(firebaseApp);
+
+    // ── Nickname ─────────────────────────────────────────────────────
+    let nickname = localStorage.getItem('loud_nickname');
+    const modal        = document.getElementById('nicknameModal');
+    const nicknameInput= document.getElementById('nicknameInput');
+    const nicknameSave = document.getElementById('nicknameSave');
+    const userChip     = document.getElementById('userChip');
+
+    function applyNickname(name) {
+      nickname = name;
+      localStorage.setItem('loud_nickname', name);
+      userChip.textContent = name;
+      modal.style.display = 'none';
+    }
+
+    if (nickname) {
+      modal.style.display = 'none';
+      userChip.textContent = nickname;
+    }
+
+    nicknameSave.addEventListener('click', () => {
+      const val = nicknameInput.value.trim();
+      if (!val) { nicknameInput.focus(); return; }
+      applyNickname(val);
+    });
+    nicknameInput.addEventListener('keydown', e => { if (e.key === 'Enter') nicknameSave.click(); });
+
+    // Tap name chip to change name
+    userChip.addEventListener('click', () => {
+      nicknameInput.value = nickname || '';
+      modal.style.display = 'flex';
+      setTimeout(() => nicknameInput.focus(), 100);
+    });
+
+    // ── Geolocation ──────────────────────────────────────────────────
+    let currentLat = null, currentLng = null;
+    const locationDot  = document.getElementById('locationDot');
+    const locationText = document.getElementById('locationText');
+
+    async function reverseGeocode(lat, lng) {
+      try {
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        const d = await r.json();
+        const a = d.address || {};
+        const parts = [
+          a.road || a.pedestrian || a.path,
+          a.suburb || a.neighbourhood,
+          a.city || a.town || a.village
+        ].filter(Boolean);
+        return parts.slice(0, 2).join(', ') || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      } catch {
+        return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      }
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(
+        async pos => {
+          currentLat = pos.coords.latitude;
+          currentLng = pos.coords.longitude;
+          locationDot.classList.add('active');
+          locationText.textContent = await reverseGeocode(currentLat, currentLng);
+          loadHistory();
+        },
+        () => { locationText.textContent = 'Location unavailable'; },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      locationText.textContent = 'Location not supported';
+    }
+
+    // ── Haversine distance (metres) ──────────────────────────────────
+    function distMetres(lat1, lng1, lat2, lng2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2
+              + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180)
+              * Math.sin(dLng/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // ── Noise level helper ───────────────────────────────────────────
+    function getLevel(db) {
+      if (db < 50) return { label: 'Quiet',    cls: 'quiet',    color: '#00c853' };
+      if (db < 70) return { label: 'Moderate', cls: 'moderate', color: '#ffd600' };
+                   return { label: 'Loud',     cls: 'loud',     color: '#ff1744' };
+    }
+
+    function timeAgo(date) {
+      const s = Math.floor((Date.now() - date) / 1000);
+      if (s < 60)    return 'just now';
+      if (s < 3600)  return `${Math.floor(s / 60)}m ago`;
+      if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+      return `${Math.floor(s / 86400)}d ago`;
+    }
+
+    function esc(str) {
+      return String(str).replace(/[&<>"']/g,
+        c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // ── History ──────────────────────────────────────────────────────
+    const historyList = document.getElementById('historyList');
+
+    async function loadHistory() {
+      if (currentLat === null) return;
+      try {
+        const q   = query(collection(firestore, 'readings'), orderBy('timestamp', 'desc'), limit(300));
+        const snap = await getDocs(q);
+
+        const nearby = [];
+        snap.forEach(doc => {
+          const d = doc.data();
+          if (d.lat && d.lng && distMetres(currentLat, currentLng, d.lat, d.lng) <= 100) {
+            nearby.push(d);
+          }
+        });
+
+        if (!nearby.length) {
+          historyList.innerHTML = '<div class="empty-msg">No readings within 100 m yet. Be the first!</div>';
+          return;
+        }
+
+        historyList.innerHTML = nearby.slice(0, 30).map(d => {
+          const lv   = getLevel(d.db);
+          const when = d.timestamp ? timeAgo(d.timestamp.toDate()) : 'just now';
+          return `
+            <div class="reading-card">
+              <div class="reading-db ${`c-${lv.cls}`}">${Math.round(d.db)}</div>
+              <div class="reading-info">
+                <div class="reading-who">${esc(d.nickname)}</div>
+                <div class="reading-meta">${when} · ${lv.label}</div>
+              </div>
+              <div class="level-dot bg-${lv.cls}"></div>
+            </div>`;
+        }).join('');
+      } catch (e) {
+        historyList.innerHTML = '<div class="empty-msg">Could not load history.</div>';
+      }
+    }
+
+    // ── Meter UI helpers ─────────────────────────────────────────────
+    const dbNumber  = document.getElementById('dbNumber');
+    const noiseLabel= document.getElementById('noiseLabel');
+    const ringFill  = document.getElementById('ringFill');
+    const CIRCUMFERENCE = 515; // 2π × 82
+
+    function updateMeterUI(db) {
+      const lv      = getLevel(db);
+      const pct     = Math.min(Math.max((db - 25) / 75, 0), 1); // map 25–100 dB → 0–100%
+      const offset  = CIRCUMFERENCE * (1 - pct);
+      ringFill.style.strokeDashoffset = offset;
+      ringFill.style.stroke           = lv.color;
+      dbNumber.textContent            = Math.round(db);
+      dbNumber.style.color            = lv.color;
+      noiseLabel.textContent          = lv.label;
+      noiseLabel.style.color          = lv.color;
+    }
+
+    // ── Measurement ──────────────────────────────────────────────────
+    const measureBtn = document.getElementById('measureBtn');
+    const statusText = document.getElementById('statusText');
+
+    measureBtn.addEventListener('click', async () => {
+      if (currentLat === null) {
+        statusText.textContent = 'Waiting for location…';
+        return;
+      }
+      if (!nickname) {
+        modal.style.display = 'flex';
+        return;
+      }
+
+      measureBtn.disabled = true;
+      statusText.textContent = 'Listening…';
+
+      let stream, audioCtx;
+      try {
+        stream   = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source   = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+
+        const buf     = new Float32Array(analyser.fftSize);
+        const samples = [];
+        const DURATION= 3000;  // ms total
+        const TICK    = 100;   // ms per sample
+
+        await new Promise(resolve => {
+          let elapsed = 0;
+          const timer = setInterval(() => {
+            analyser.getFloatTimeDomainData(buf);
+            let sum = 0;
+            for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+            const rms = Math.sqrt(sum / buf.length);
+            // +90 offset maps dBFS to approximate SPL range
+            const db  = rms > 0 ? 20 * Math.log10(rms) + 90 : 30;
+            samples.push(db);
+            updateMeterUI(Math.max(30, db));
+
+            elapsed += TICK;
+            const secLeft = Math.ceil((DURATION - elapsed) / 1000);
+            statusText.textContent = `Listening… ${secLeft}s`;
+
+            if (elapsed >= DURATION) {
+              clearInterval(timer);
+              resolve();
+            }
+          }, TICK);
+        });
+
+      } catch (err) {
+        statusText.textContent = 'Microphone access denied.';
+        measureBtn.disabled = false;
+        return;
+      } finally {
+        if (stream)   stream.getTracks().forEach(t => t.stop());
+        if (audioCtx) audioCtx.close();
+      }
+
+      // Average the samples
+      const avg    = samples.reduce((a, b) => a + b, 0) / samples.length;
+      const finalDb= Math.max(30, Math.round(avg * 10) / 10);
+      updateMeterUI(finalDb);
+      statusText.textContent = 'Saving…';
+
+      try {
+        await addDoc(collection(firestore, 'readings'), {
+          lat:       currentLat,
+          lng:       currentLng,
+          db:        finalDb,
+          nickname:  nickname,
+          timestamp: serverTimestamp()
+        });
+        statusText.textContent = 'Saved!';
+        await loadHistory();
+        setTimeout(() => { statusText.textContent = ''; }, 2000);
+      } catch {
+        statusText.textContent = 'Error saving. Check connection.';
+      }
+
+      measureBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>

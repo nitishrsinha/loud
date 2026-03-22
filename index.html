@@ -1,556 +1,704 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Loud</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOUD</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      background: #0a0a0a;
-      color: #fff;
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface2: #1e1e1e;
+      --border: #2a2a2a;
+      --text: #ffffff;
+      --text-muted: #888;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --header-h: 100px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      overflow: hidden;
     }
 
-    /* --- Nickname modal --- */
-    .modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.92);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      padding: 24px;
+    /* ── Modal ── */
+    #modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.85);
+      display: flex; align-items: center; justify-content: center;
     }
+    #modal-overlay.hidden { display: none; }
+
     .modal-box {
-      background: #1a1a1a;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 20px;
-      padding: 32px 24px;
-      width: 100%;
-      max-width: 320px;
+      padding: 36px 28px;
+      width: min(360px, 90vw);
       text-align: center;
     }
-    .modal-box h2 { font-size: 22px; margin-bottom: 8px; }
-    .modal-box p  { font-size: 14px; color: #888; margin-bottom: 24px; line-height: 1.5; }
-    .modal-input {
+    .modal-box h2 { font-size: 2rem; letter-spacing: 6px; margin-bottom: 8px; }
+    .modal-box p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 24px; }
+    .modal-box input {
       width: 100%;
-      background: #2a2a2a;
-      border: 1px solid #333;
-      border-radius: 10px;
-      padding: 14px;
-      font-size: 16px;
-      color: #fff;
-      text-align: center;
-      margin-bottom: 14px;
+      padding: 14px 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+      margin-bottom: 16px;
+      transition: border-color 0.2s;
     }
-    .modal-input:focus { outline: none; border-color: #555; }
-    .modal-btn {
+    .modal-box input:focus { border-color: var(--blue); }
+    .modal-box button {
       width: 100%;
-      background: #fff;
-      color: #000;
-      border: none;
-      border-radius: 10px;
       padding: 14px;
-      font-size: 16px;
-      font-weight: 600;
+      background: var(--blue);
+      border: none; border-radius: 12px;
+      color: #fff; font-size: 1rem; font-weight: 600;
       cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .modal-box button:hover { opacity: 0.85; }
+
+    /* ── Header ── */
+    #header {
+      height: var(--header-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 12px 20px 0;
+      position: relative; z-index: 10;
+    }
+    .header-top {
+      display: flex; align-items: center; gap: 10px;
+      flex: 1;
+    }
+    .header-top h1 {
+      font-size: 1.6rem; letter-spacing: 5px; font-weight: 800;
+    }
+    .header-nickname {
+      font-size: 0.85rem; color: var(--text-muted);
+      background: var(--surface2);
+      padding: 4px 10px; border-radius: 20px;
+      border: 1px solid var(--border);
+      max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .tabs {
+      display: flex; gap: 4px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 8px 0;
+      background: none; border: none;
+      color: var(--text-muted);
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 2px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab-btn.active {
+      color: var(--text);
+      border-bottom-color: var(--blue);
     }
 
-    /* --- Header --- */
-    header {
-      padding: 20px;
-      text-align: center;
-      border-bottom: 1px solid #1a1a1a;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
+    /* ── Views ── */
+    .view {
+      position: absolute;
+      top: var(--header-h); left: 0; right: 0;
+      bottom: 0;
+      overflow-y: auto;
+      transition: opacity 0.25s, transform 0.25s;
     }
-    header h1 {
-      font-size: 24px;
-      font-weight: 700;
-      letter-spacing: 6px;
-      text-transform: uppercase;
+    .view.hidden {
+      opacity: 0; pointer-events: none; transform: translateY(8px);
     }
-    .user-chip {
-      font-size: 12px;
-      color: #555;
-      letter-spacing: 1px;
-      cursor: pointer;
-    }
-    .user-chip:hover { color: #888; }
 
-    /* --- Location bar --- */
+    /* ── Measure Tab ── */
+    #view-measure {
+      padding: 20px 20px 40px;
+      display: flex; flex-direction: column; align-items: center; gap: 20px;
+    }
+
     .location-bar {
-      padding: 10px 20px;
-      background: #111;
-      font-size: 13px;
-      color: #666;
-      text-align: center;
-      min-height: 38px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 10px 16px;
+      width: 100%; max-width: 420px;
+      font-size: 0.85rem; color: var(--text-muted);
     }
     .location-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: #555;
-      flex-shrink: 0;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--border); flex-shrink: 0;
+      transition: background 0.4s;
     }
-    .location-dot.active { background: #00c853; }
+    .location-dot.found { background: var(--green); }
+    #location-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    /* --- Meter --- */
-    .meter-section {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 36px 20px 28px;
-      gap: 20px;
+    /* ── SVG Meter ── */
+    .meter-wrap {
+      position: relative; width: 260px; height: 170px;
     }
-
-    .meter-ring {
-      position: relative;
-      width: 190px;
-      height: 190px;
+    .meter-svg {
+      width: 260px; height: 170px; overflow: visible;
     }
-    .meter-ring svg {
-      position: absolute;
-      inset: 0;
-      transform: rotate(-90deg);
-    }
-    .ring-track { stroke: #1e1e1e; }
-    .ring-fill  { stroke: #333; stroke-linecap: round; transition: stroke-dashoffset 0.2s, stroke 0.2s; }
-
-    .meter-inner {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+    .meter-center {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding-bottom: 10px;
     }
     .db-number {
-      font-size: 62px;
-      font-weight: 200;
-      line-height: 1;
-      letter-spacing: -2px;
+      font-size: 3.2rem; font-weight: 800; line-height: 1;
+      transition: color 0.4s;
     }
-    .db-unit {
-      font-size: 13px;
-      color: #555;
-      letter-spacing: 3px;
-      margin-top: 2px;
+    .db-unit { font-size: 1rem; color: var(--text-muted); margin-top: 2px; }
+    .db-label {
+      font-size: 0.75rem; letter-spacing: 3px; font-weight: 700;
+      color: var(--text-muted); margin-top: 4px;
     }
 
-    .noise-label {
-      font-size: 15px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: #555;
-      min-height: 20px;
-    }
-
+    /* ── Measure Button ── */
     .measure-btn {
-      background: #fff;
-      color: #000;
-      border: none;
-      border-radius: 50px;
-      padding: 16px 52px;
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      cursor: pointer;
-      transition: opacity 0.15s, transform 0.1s;
+      padding: 16px 48px;
+      background: var(--blue);
+      border: none; border-radius: 50px;
+      color: #fff; font-size: 1rem; font-weight: 700; letter-spacing: 2px;
+      cursor: pointer; transition: opacity 0.2s, transform 0.1s;
     }
-    .measure-btn:active  { transform: scale(0.97); }
-    .measure-btn:disabled { opacity: 0.35; cursor: default; }
+    .measure-btn:active { transform: scale(0.97); }
+    .measure-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .measure-btn.listening { background: var(--red); }
 
-    .status-text {
-      font-size: 13px;
-      color: #555;
-      min-height: 18px;
-      letter-spacing: 0.5px;
+    /* ── Nearby ── */
+    .nearby-section { width: 100%; max-width: 420px; }
+    .nearby-section h3 {
+      font-size: 0.75rem; letter-spacing: 3px; color: var(--text-muted);
+      margin-bottom: 12px;
     }
-
-    /* --- History --- */
-    .history-section {
-      flex: 1;
-      padding: 0 16px 32px;
-      border-top: 1px solid #1a1a1a;
-    }
-    .history-header {
-      font-size: 11px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: #444;
-      padding: 16px 4px 12px;
-    }
-    .reading-card {
-      background: #111;
-      border-radius: 14px;
-      padding: 14px 16px;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
+    .nearby-list { display: flex; flex-direction: column; gap: 8px; }
+    .reading-item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px;
     }
     .reading-db {
-      font-size: 30px;
-      font-weight: 200;
-      min-width: 58px;
-      letter-spacing: -1px;
+      font-size: 1.4rem; font-weight: 800; min-width: 52px;
     }
     .reading-info { flex: 1; }
-    .reading-who  { font-size: 14px; font-weight: 500; }
-    .reading-meta { font-size: 12px; color: #555; margin-top: 3px; }
-    .level-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
+    .reading-nickname { font-size: 0.9rem; font-weight: 600; }
+    .reading-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+    .reading-badge {
+      font-size: 0.65rem; letter-spacing: 2px; font-weight: 700;
+      padding: 3px 8px; border-radius: 20px; border: 1px solid;
+    }
+    .badge-quiet   { color: var(--green); border-color: var(--green); }
+    .badge-moderate{ color: var(--yellow); border-color: var(--yellow); }
+    .badge-loud    { color: var(--red);   border-color: var(--red);   }
+
+    .empty-state {
+      text-align: center; color: var(--text-muted); font-size: 0.85rem;
+      padding: 24px 0;
     }
 
-    .empty-msg {
-      text-align: center;
-      color: #333;
-      font-size: 13px;
-      padding: 28px 0;
-      letter-spacing: 0.5px;
+    /* ── Map Tab ── */
+    #view-map {
+      padding: 0;
+      overflow: hidden;
+    }
+    #map {
+      width: 100%; height: 100%;
     }
 
-    /* Level colors */
-    .c-quiet    { color: #00c853; }
-    .c-moderate { color: #ffd600; }
-    .c-loud     { color: #ff1744; }
-    .bg-quiet    { background: #00c853; }
-    .bg-moderate { background: #ffd600; }
-    .bg-loud     { background: #ff1744; }
+    /* Pulsing dot */
+    .pulse-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--blue);
+      box-shadow: 0 0 0 0 rgba(59,130,246,0.6);
+      animation: pulse 1.6s infinite;
+    }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0   rgba(59,130,246,0.6); }
+      70%  { box-shadow: 0 0 0 12px rgba(59,130,246,0); }
+      100% { box-shadow: 0 0 0 0   rgba(59,130,246,0); }
+    }
+
+    /* Leaflet popup tweak */
+    .leaflet-popup-content-wrapper {
+      background: var(--surface) !important;
+      color: var(--text) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
+    }
+    .leaflet-popup-tip { background: var(--surface) !important; }
+    .popup-db { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; }
+    .popup-meta { font-size: 0.8rem; color: var(--text-muted); line-height: 1.6; }
   </style>
 </head>
 <body>
 
-  <!-- Nickname modal -->
-  <div class="modal" id="nicknameModal">
-    <div class="modal-box">
-      <h2>Welcome to Loud</h2>
-      <p>Enter your name so your family knows who recorded each measurement.</p>
-      <input class="modal-input" id="nicknameInput" type="text" placeholder="Your name" maxlength="20" autocomplete="off">
-      <button class="modal-btn" id="nicknameSave">Get started</button>
-    </div>
+<!-- Nickname Modal -->
+<div id="modal-overlay">
+  <div class="modal-box">
+    <h2>LOUD</h2>
+    <p>What should we call you?</p>
+    <input id="nickname-input" type="text" placeholder="Enter your name" maxlength="30" autocomplete="off" />
+    <button id="nickname-submit">Let's go</button>
   </div>
+</div>
 
-  <header>
-    <h1>Loud</h1>
-    <span class="user-chip" id="userChip" title="Tap to change name"></span>
-  </header>
+<!-- Header -->
+<div id="header">
+  <div class="header-top">
+    <h1>LOUD</h1>
+    <span class="header-nickname" id="header-nickname"></span>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="measure">MEASURE</button>
+    <button class="tab-btn"        data-tab="map">MAP</button>
+  </div>
+</div>
 
+<!-- Measure View -->
+<div id="view-measure" class="view">
   <div class="location-bar">
-    <div class="location-dot" id="locationDot"></div>
-    <span id="locationText">Locating…</span>
+    <div class="location-dot" id="location-dot"></div>
+    <span id="location-text">Locating…</span>
   </div>
 
-  <div class="meter-section">
-    <!-- Circular ring meter -->
-    <div class="meter-ring">
-      <svg viewBox="0 0 190 190" width="190" height="190">
-        <circle class="ring-track" cx="95" cy="95" r="82" fill="none" stroke-width="8"/>
-        <circle class="ring-fill"  cx="95" cy="95" r="82" fill="none" stroke-width="8"
-          stroke-dasharray="515"
-          stroke-dashoffset="515"
-          id="ringFill"/>
-      </svg>
-      <div class="meter-inner">
-        <span class="db-number" id="dbNumber">--</span>
-        <span class="db-unit">dB</span>
-      </div>
-    </div>
-
-    <span class="noise-label" id="noiseLabel"></span>
-    <button class="measure-btn" id="measureBtn">Measure</button>
-    <span class="status-text" id="statusText"></span>
-  </div>
-
-  <div class="history-section">
-    <div class="history-header">Nearby readings</div>
-    <div id="historyList">
-      <div class="empty-msg">No readings nearby yet.</div>
+  <div class="meter-wrap">
+    <svg class="meter-svg" viewBox="0 0 260 170">
+      <!-- track arc -->
+      <path id="arc-track" d="" fill="none" stroke="#1e1e1e" stroke-width="14" stroke-linecap="round"/>
+      <!-- value arc -->
+      <path id="arc-value" d="" fill="none" stroke="#22c55e" stroke-width="14" stroke-linecap="round"
+            stroke-dasharray="0 1000" style="transition: stroke-dasharray 0.5s ease, stroke 0.4s ease;"/>
+    </svg>
+    <div class="meter-center">
+      <span class="db-number" id="db-number">--</span>
+      <span class="db-unit">dB</span>
+      <span class="db-label" id="db-label">--</span>
     </div>
   </div>
 
-  <script type="module">
-    import { initializeApp }       from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, query,
-             orderBy, limit, getDocs, serverTimestamp }
-                                   from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+  <button class="measure-btn" id="measure-btn">MEASURE</button>
 
-    // ── Firebase init ────────────────────────────────────────────────
-    const firebaseConfig = {
-      apiKey:            "AIzaSyDuYM4gEzOkqpDZ0KN5DfK2KV_3xBdf-OM",
-      authDomain:        "loud-e6760.firebaseapp.com",
-      projectId:         "loud-e6760",
-      storageBucket:     "loud-e6760.firebasestorage.app",
-      messagingSenderId: "139350793793",
-      appId:             "1:139350793793:web:c5e231109b36f758c1b0c0"
-    };
-    const firebaseApp = initializeApp(firebaseConfig);
-    const firestore   = getFirestore(firebaseApp);
+  <div class="nearby-section">
+    <h3>NEARBY READINGS</h3>
+    <div class="nearby-list" id="nearby-list">
+      <div class="empty-state">No readings within 100m yet</div>
+    </div>
+  </div>
+</div>
 
-    // ── Nickname ─────────────────────────────────────────────────────
-    let nickname = localStorage.getItem('loud_nickname');
-    const modal        = document.getElementById('nicknameModal');
-    const nicknameInput= document.getElementById('nicknameInput');
-    const nicknameSave = document.getElementById('nicknameSave');
-    const userChip     = document.getElementById('userChip');
+<!-- Map View -->
+<div id="view-map" class="view hidden">
+  <div id="map"></div>
+</div>
 
-    function applyNickname(name) {
-      nickname = name;
-      localStorage.setItem('loud_nickname', name);
-      userChip.textContent = name;
-      modal.style.display = 'none';
-    }
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+import { initializeApp }       from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js';
+import { getFirestore,
+         collection, addDoc,
+         getDocs, query,
+         orderBy, limit,
+         serverTimestamp }     from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js';
 
-    if (nickname) {
-      modal.style.display = 'none';
-      userChip.textContent = nickname;
-    }
+// ─── Firebase ───────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDuYM4gEzOkqpDZ0KN5DfK2KV_3xBdf-OM",
+  authDomain: "loud-e6760.firebaseapp.com",
+  projectId: "loud-e6760",
+  storageBucket: "loud-e6760.firebasestorage.app",
+  messagingSenderId: "139350793793",
+  appId: "1:139350793793:web:c5e231109b36f758c1b0c0"
+};
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
 
-    nicknameSave.addEventListener('click', () => {
-      const val = nicknameInput.value.trim();
-      if (!val) { nicknameInput.focus(); return; }
-      applyNickname(val);
-    });
-    nicknameInput.addEventListener('keydown', e => { if (e.key === 'Enter') nicknameSave.click(); });
+// ─── Helpers ────────────────────────────────────────────────
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
 
-    // Tap name chip to change name
-    userChip.addEventListener('click', () => {
-      nicknameInput.value = nickname || '';
-      modal.style.display = 'flex';
-      setTimeout(() => nicknameInput.focus(), 100);
-    });
+function timeAgo(ts) {
+  if (!ts) return 'just now';
+  const secs = Math.floor((Date.now() - ts) / 1000);
+  if (secs < 5)  return 'just now';
+  if (secs < 60) return secs + 's ago';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs  < 24) return hrs  + 'h ago';
+  return Math.floor(hrs / 24) + 'd ago';
+}
 
-    // ── Geolocation ──────────────────────────────────────────────────
-    let currentLat = null, currentLng = null;
-    const locationDot  = document.getElementById('locationDot');
-    const locationText = document.getElementById('locationText');
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
 
-    async function reverseGeocode(lat, lng) {
-      try {
-        const r = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-          { headers: { 'Accept-Language': 'en' } }
-        );
-        const d = await r.json();
-        const a = d.address || {};
-        const parts = [
-          a.road || a.pedestrian || a.path,
-          a.suburb || a.neighbourhood,
-          a.city || a.town || a.village
-        ].filter(Boolean);
-        return parts.slice(0, 2).join(', ') || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-      } catch {
-        return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+function dbColor(db) {
+  if (db < 50) return '#22c55e';
+  if (db < 70) return '#eab308';
+  return '#ef4444';
+}
+
+function dbLabel(db) {
+  if (db === null || isNaN(db)) return '--';
+  if (db < 50) return 'QUIET';
+  if (db < 70) return 'MODERATE';
+  return 'LOUD';
+}
+
+function badgeClass(label) {
+  if (label === 'QUIET')    return 'badge-quiet';
+  if (label === 'MODERATE') return 'badge-moderate';
+  return 'badge-loud';
+}
+
+// ─── SVG Arc ────────────────────────────────────────────────
+const CX = 130, CY = 145, R = 100;
+const START_DEG = 225, TOTAL_SWEEP = 270;
+
+function polarToXY(cx, cy, r, deg) {
+  const rad = (deg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function arcPath(cx, cy, r, startDeg, endDeg) {
+  const s = polarToXY(cx, cy, r, startDeg);
+  const e = polarToXY(cx, cy, r, endDeg);
+  const sweep = endDeg - startDeg;
+  const large = sweep > 180 ? 1 : 0;
+  return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
+}
+
+function arcLength(r, degrees) {
+  return (degrees / 360) * 2 * Math.PI * r;
+}
+
+const FULL_LEN = arcLength(R, TOTAL_SWEEP);
+
+function setTrackArc() {
+  document.getElementById('arc-track').setAttribute('d',
+    arcPath(CX, CY, R, START_DEG, START_DEG + TOTAL_SWEEP));
+}
+
+function setValueArc(dbVal) {
+  const arcEl = document.getElementById('arc-value');
+  arcEl.setAttribute('d', arcPath(CX, CY, R, START_DEG, START_DEG + TOTAL_SWEEP));
+  const MIN_DB = 20, MAX_DB = 100;
+  const clamped = Math.max(MIN_DB, Math.min(MAX_DB, dbVal));
+  const frac = (clamped - MIN_DB) / (MAX_DB - MIN_DB);
+  const len  = frac * FULL_LEN;
+  arcEl.style.strokeDasharray = `${len} ${FULL_LEN + 10}`;
+  arcEl.style.stroke = dbColor(dbVal);
+}
+
+setTrackArc();
+
+// ─── Nickname ───────────────────────────────────────────────
+let nickname = localStorage.getItem('loud_nickname') || '';
+
+function applyNickname(name) {
+  nickname = name;
+  document.getElementById('header-nickname').textContent = name;
+}
+
+const modalOverlay   = document.getElementById('modal-overlay');
+const nicknameInput  = document.getElementById('nickname-input');
+const nicknameSubmit = document.getElementById('nickname-submit');
+
+function submitNickname() {
+  const val = nicknameInput.value.trim();
+  if (!val) { nicknameInput.focus(); return; }
+  localStorage.setItem('loud_nickname', val);
+  applyNickname(val);
+  modalOverlay.classList.add('hidden');
+}
+
+nicknameSubmit.addEventListener('click', submitNickname);
+nicknameInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitNickname(); });
+
+if (nickname) {
+  applyNickname(nickname);
+  modalOverlay.classList.add('hidden');
+} else {
+  setTimeout(() => nicknameInput.focus(), 100);
+}
+
+// ─── Geolocation ────────────────────────────────────────────
+let userLat = null, userLng = null, userAddress = 'Unknown location';
+
+function reverseGeocode(lat, lng) {
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
+    headers: { 'Accept-Language': 'en' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    const addr = data.address || {};
+    userAddress = [
+      addr.road || addr.pedestrian || addr.footway,
+      addr.suburb || addr.neighbourhood || addr.city_district,
+      addr.city || addr.town || addr.village
+    ].filter(Boolean).join(', ') || data.display_name || 'Unknown location';
+    document.getElementById('location-text').textContent = userAddress;
+    document.getElementById('location-dot').classList.add('found');
+  })
+  .catch(() => {
+    document.getElementById('location-text').textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    document.getElementById('location-dot').classList.add('found');
+  });
+}
+
+function getLocation() {
+  if (!navigator.geolocation) {
+    document.getElementById('location-text').textContent = 'Geolocation not supported';
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      reverseGeocode(userLat, userLng);
+      loadNearbyReadings();
+      if (leafletMap) {
+        leafletMap.setView([userLat, userLng], 16);
+        updateUserMarker();
       }
-    }
+    },
+    err => {
+      document.getElementById('location-text').textContent = 'Location unavailable — please allow location access';
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
 
-    if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(
-        async pos => {
-          currentLat = pos.coords.latitude;
-          currentLng = pos.coords.longitude;
-          locationDot.classList.add('active');
-          locationText.textContent = await reverseGeocode(currentLat, currentLng);
-          loadHistory();
-        },
-        () => { locationText.textContent = 'Location unavailable'; },
-        { enableHighAccuracy: true }
-      );
-    } else {
-      locationText.textContent = 'Location not supported';
-    }
+getLocation();
 
-    // ── Haversine distance (metres) ──────────────────────────────────
-    function distMetres(lat1, lng1, lat2, lng2) {
-      const R = 6371000;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLng = (lng2 - lng1) * Math.PI / 180;
-      const a = Math.sin(dLat/2)**2
-              + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180)
-              * Math.sin(dLng/2)**2;
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
+// ─── Tabs ────────────────────────────────────────────────────
+const tabBtns = document.querySelectorAll('.tab-btn');
+const views   = { measure: document.getElementById('view-measure'),
+                  map:     document.getElementById('view-map') };
+let activeTab      = 'measure';
+let mapInitialized = false;
 
-    // ── Noise level helper ───────────────────────────────────────────
-    function getLevel(db) {
-      if (db < 50) return { label: 'Quiet',    cls: 'quiet',    color: '#00c853' };
-      if (db < 70) return { label: 'Moderate', cls: 'moderate', color: '#ffd600' };
-                   return { label: 'Loud',     cls: 'loud',     color: '#ff1744' };
-    }
+tabBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    if (tab === activeTab) return;
+    tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    views[activeTab].classList.add('hidden');
+    views[tab].classList.remove('hidden');
+    activeTab = tab;
+    if (tab === 'map') initMap();
+  });
+});
 
-    function timeAgo(date) {
-      const s = Math.floor((Date.now() - date) / 1000);
-      if (s < 60)    return 'just now';
-      if (s < 3600)  return `${Math.floor(s / 60)}m ago`;
-      if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-      return `${Math.floor(s / 86400)}d ago`;
-    }
+// ─── Measure ────────────────────────────────────────────────
+const measureBtn = document.getElementById('measure-btn');
+const dbNumber   = document.getElementById('db-number');
+const dbLabelEl  = document.getElementById('db-label');
 
-    function esc(str) {
-      return String(str).replace(/[&<>"']/g,
-        c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    }
+measureBtn.addEventListener('click', async () => {
+  if (measureBtn.disabled) return;
+  measureBtn.disabled = true;
+  measureBtn.classList.add('listening');
 
-    // ── History ──────────────────────────────────────────────────────
-    const historyList = document.getElementById('historyList');
+  let audioCtx, analyser, source, stream;
 
-    async function loadHistory() {
-      if (currentLat === null) return;
-      try {
-        const q   = query(collection(firestore, 'readings'), orderBy('timestamp', 'desc'), limit(300));
-        const snap = await getDocs(q);
+  try {
+    stream   = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    source   = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
 
-        const nearby = [];
-        snap.forEach(doc => {
-          const d = doc.data();
-          if (d.lat && d.lng && distMetres(currentLat, currentLng, d.lat, d.lng) <= 100) {
-            nearby.push(d);
+    const bufLen  = analyser.fftSize;
+    const dataArr = new Float32Array(bufLen);
+
+    const DURATION = 3;
+    let dbSum = 0, dbCount = 0;
+
+    for (let t = DURATION; t >= 1; t--) {
+      measureBtn.textContent = `Listening… ${t}s`;
+      await new Promise(resolve => {
+        const end = Date.now() + 1000;
+        const tick = () => {
+          analyser.getFloatTimeDomainData(dataArr);
+          let rms = 0;
+          for (let i = 0; i < bufLen; i++) rms += dataArr[i] * dataArr[i];
+          rms = Math.sqrt(rms / bufLen);
+          if (rms > 0) {
+            const dbVal = 20 * Math.log10(rms) + 90;
+            dbSum += dbVal; dbCount++;
+            const disp = Math.round(dbVal);
+            dbNumber.textContent = disp;
+            dbNumber.style.color = dbColor(disp);
+            dbLabelEl.textContent = dbLabel(disp);
+            setValueArc(disp);
           }
-        });
-
-        if (!nearby.length) {
-          historyList.innerHTML = '<div class="empty-msg">No readings within 100 m yet. Be the first!</div>';
-          return;
-        }
-
-        historyList.innerHTML = nearby.slice(0, 30).map(d => {
-          const lv   = getLevel(d.db);
-          const when = d.timestamp ? timeAgo(d.timestamp.toDate()) : 'just now';
-          return `
-            <div class="reading-card">
-              <div class="reading-db ${`c-${lv.cls}`}">${Math.round(d.db)}</div>
-              <div class="reading-info">
-                <div class="reading-who">${esc(d.nickname)}</div>
-                <div class="reading-meta">${when} · ${lv.label}</div>
-              </div>
-              <div class="level-dot bg-${lv.cls}"></div>
-            </div>`;
-        }).join('');
-      } catch (e) {
-        historyList.innerHTML = '<div class="empty-msg">Could not load history.</div>';
-      }
+          if (Date.now() < end) requestAnimationFrame(tick);
+          else resolve();
+        };
+        tick();
+      });
     }
 
-    // ── Meter UI helpers ─────────────────────────────────────────────
-    const dbNumber  = document.getElementById('dbNumber');
-    const noiseLabel= document.getElementById('noiseLabel');
-    const ringFill  = document.getElementById('ringFill');
-    const CIRCUMFERENCE = 515; // 2π × 82
+    const avgDb = dbCount > 0 ? Math.round(dbSum / dbCount) : 0;
+    dbNumber.textContent = avgDb;
+    dbNumber.style.color = dbColor(avgDb);
+    dbLabelEl.textContent = dbLabel(avgDb);
+    setValueArc(avgDb);
 
-    function updateMeterUI(db) {
-      const lv      = getLevel(db);
-      const pct     = Math.min(Math.max((db - 25) / 75, 0), 1); // map 25–100 dB → 0–100%
-      const offset  = CIRCUMFERENCE * (1 - pct);
-      ringFill.style.strokeDashoffset = offset;
-      ringFill.style.stroke           = lv.color;
-      dbNumber.textContent            = Math.round(db);
-      dbNumber.style.color            = lv.color;
-      noiseLabel.textContent          = lv.label;
-      noiseLabel.style.color          = lv.color;
+    if (userLat !== null) {
+      await addDoc(collection(db, 'readings'), {
+        lat:       userLat,
+        lng:       userLng,
+        db:        avgDb,
+        nickname:  nickname || 'Anonymous',
+        address:   userAddress,
+        timestamp: serverTimestamp()
+      });
+      loadNearbyReadings();
+      if (mapInitialized) loadMapReadings();
     }
+  } catch (err) {
+    console.error(err);
+    measureBtn.textContent = 'Error – retry';
+  } finally {
+    if (source)   try { source.disconnect(); } catch(_){}
+    if (analyser) try { analyser.disconnect(); } catch(_){}
+    if (audioCtx) try { audioCtx.close(); } catch(_){}
+    if (stream)   stream.getTracks().forEach(t => t.stop());
+    measureBtn.disabled = false;
+    measureBtn.classList.remove('listening');
+    measureBtn.textContent = 'MEASURE';
+  }
+});
 
-    // ── Measurement ──────────────────────────────────────────────────
-    const measureBtn = document.getElementById('measureBtn');
-    const statusText = document.getElementById('statusText');
-
-    measureBtn.addEventListener('click', async () => {
-      if (currentLat === null) {
-        statusText.textContent = 'Waiting for location…';
-        return;
-      }
-      if (!nickname) {
-        modal.style.display = 'flex';
-        return;
-      }
-
-      measureBtn.disabled = true;
-      statusText.textContent = 'Listening…';
-
-      let stream, audioCtx;
-      try {
-        stream   = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const source   = audioCtx.createMediaStreamSource(stream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 2048;
-        source.connect(analyser);
-
-        const buf     = new Float32Array(analyser.fftSize);
-        const samples = [];
-        const DURATION= 3000;  // ms total
-        const TICK    = 100;   // ms per sample
-
-        await new Promise(resolve => {
-          let elapsed = 0;
-          const timer = setInterval(() => {
-            analyser.getFloatTimeDomainData(buf);
-            let sum = 0;
-            for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-            const rms = Math.sqrt(sum / buf.length);
-            // +90 offset maps dBFS to approximate SPL range
-            const db  = rms > 0 ? 20 * Math.log10(rms) + 90 : 30;
-            samples.push(db);
-            updateMeterUI(Math.max(30, db));
-
-            elapsed += TICK;
-            const secLeft = Math.ceil((DURATION - elapsed) / 1000);
-            statusText.textContent = `Listening… ${secLeft}s`;
-
-            if (elapsed >= DURATION) {
-              clearInterval(timer);
-              resolve();
-            }
-          }, TICK);
-        });
-
-      } catch (err) {
-        statusText.textContent = 'Microphone access denied.';
-        measureBtn.disabled = false;
-        return;
-      } finally {
-        if (stream)   stream.getTracks().forEach(t => t.stop());
-        if (audioCtx) audioCtx.close();
-      }
-
-      // Average the samples
-      const avg    = samples.reduce((a, b) => a + b, 0) / samples.length;
-      const finalDb= Math.max(30, Math.round(avg * 10) / 10);
-      updateMeterUI(finalDb);
-      statusText.textContent = 'Saving…';
-
-      try {
-        await addDoc(collection(firestore, 'readings'), {
-          lat:       currentLat,
-          lng:       currentLng,
-          db:        finalDb,
-          nickname:  nickname,
-          timestamp: serverTimestamp()
-        });
-        statusText.textContent = 'Saved!';
-        await loadHistory();
-        setTimeout(() => { statusText.textContent = ''; }, 2000);
-      } catch {
-        statusText.textContent = 'Error saving. Check connection.';
-      }
-
-      measureBtn.disabled = false;
+// ─── Nearby Readings ────────────────────────────────────────
+async function loadNearbyReadings() {
+  if (userLat === null) return;
+  const nearbyList = document.getElementById('nearby-list');
+  try {
+    const q = query(collection(db,'readings'), orderBy('timestamp','desc'), limit(200));
+    const snap = await getDocs(q);
+    const nearby = [];
+    snap.forEach(doc => {
+      const d = doc.data();
+      if (haversine(userLat, userLng, d.lat, d.lng) <= 100) nearby.push(d);
     });
-  </script>
+
+    if (nearby.length === 0) {
+      nearbyList.innerHTML = '<div class="empty-state">No readings within 100m yet</div>';
+      return;
+    }
+
+    nearbyList.innerHTML = nearby.map(d => {
+      const label = dbLabel(d.db);
+      const color = dbColor(d.db);
+      const ts    = d.timestamp ? d.timestamp.toMillis() : null;
+      return `
+        <div class="reading-item">
+          <span class="reading-db" style="color:${color}">${Math.round(d.db)}<small style="font-size:0.55em;color:#888"> dB</small></span>
+          <div class="reading-info">
+            <div class="reading-nickname">${escapeHtml(d.nickname || 'Anonymous')}</div>
+            <div class="reading-meta">${timeAgo(ts)}${d.address ? ' · ' + escapeHtml(d.address.split(',')[0]) : ''}</div>
+          </div>
+          <span class="reading-badge ${badgeClass(label)}">${label}</span>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    console.error('loadNearbyReadings:', e);
+  }
+}
+
+// ─── Map ─────────────────────────────────────────────────────
+let leafletMap = null, userMarker = null, readingLayers = [];
+
+function initMap() {
+  if (mapInitialized) return;
+  mapInitialized = true;
+
+  const center = userLat ? [userLat, userLng] : [51.505, -0.09];
+  leafletMap = L.map('map', { zoomControl: true }).setView(center, 15);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors © CARTO',
+    maxZoom: 19
+  }).addTo(leafletMap);
+
+  if (userLat) updateUserMarker();
+  loadMapReadings();
+}
+
+function updateUserMarker() {
+  if (!leafletMap) return;
+  const el = document.createElement('div');
+  el.className = 'pulse-dot';
+  if (userMarker) userMarker.remove();
+  userMarker = L.marker([userLat, userLng], {
+    icon: L.divIcon({ className: '', html: el, iconSize: [14,14], iconAnchor: [7,7] })
+  }).addTo(leafletMap);
+  leafletMap.setView([userLat, userLng], leafletMap.getZoom());
+}
+
+async function loadMapReadings() {
+  if (!leafletMap) return;
+  readingLayers.forEach(l => l.remove());
+  readingLayers = [];
+
+  try {
+    const q = query(collection(db,'readings'), orderBy('timestamp','desc'), limit(500));
+    const snap = await getDocs(q);
+    snap.forEach(doc => {
+      const d = doc.data();
+      const color  = dbColor(d.db);
+      const radius = 8 + (d.db / 100) * 18;
+      const ts     = d.timestamp ? d.timestamp.toMillis() : null;
+      const label  = dbLabel(d.db);
+      const circle = L.circleMarker([d.lat, d.lng], {
+        radius, color, fillColor: color, fillOpacity: 0.45, weight: 2
+      }).addTo(leafletMap);
+
+      circle.bindPopup(`
+        <div class="popup-db" style="color:${color}">${Math.round(d.db)} dB</div>
+        <div class="popup-meta">
+          <b>${escapeHtml(d.nickname || 'Anonymous')}</b><br/>
+          ${label}<br/>
+          ${timeAgo(ts)}<br/>
+          ${d.address ? escapeHtml(d.address) : ''}
+        </div>
+      `);
+      readingLayers.push(circle);
+    });
+  } catch(e) {
+    console.error('loadMapReadings:', e);
+  }
+}
+</script>
 </body>
 </html>
